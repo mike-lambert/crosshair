@@ -3,7 +3,7 @@ package ru.cyberspacelabs.crosshair.model;
 /**
  * Created by mzakharov on 03.02.17.
  */
-public class GameServer {
+public class GameServer implements Comparable<GameServer> {
     private String address;
     private int serverProtocol;
     private String map;
@@ -111,5 +111,13 @@ public class GameServer {
         int result = getAddress().hashCode();
         result = 31 * result + getServerProtocol();
         return result;
+    }
+
+    @Override
+    public int compareTo(GameServer o) {
+        if (o == null){ throw  new NullPointerException("Cannot compare to null");}
+        int a = this.getAddress().compareTo(o.getAddress()) * 1;
+        int b = this.getServerProtocol() == o.getServerProtocol() ? 0 : -2;
+        return this.equals(o) ? 0 :  (a+b) > 0 ? 1 : -1;
     }
 }
