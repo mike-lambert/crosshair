@@ -1,0 +1,22 @@
+group 'ru.cyberspacelabs'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+apply plugin: 'application'
+
+mainClassName = 'ru.cyberspacelabs.crosshair.Main'
+jar {
+    manifest {
+        attributes 'Implementation-Title': project.getProperty('name'),
+                'Implementation-Version': project.getProperty('version'),
+                'Main-Class': project.getProperty('mainClassName')
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+}
