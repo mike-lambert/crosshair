@@ -16,6 +16,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import static ru.cyberspacelabs.crosshair.util.RuntimeUtil.log;
+
 /**
  * Created by mzakharov on 03.02.17.
  */
@@ -55,10 +57,10 @@ public class MasterServer extends Threaded {
 
         @Override
         public void run() {
-            System.out.println(new Date() + ": " + Thread.currentThread().getName() + " | seeking expired records");
+            log("seeking expired records");
             MasterServer.this.servers.forEach(server -> {
                 if (server.getLastHeartbeat() + MasterServer.this.getExpireTimeout() < System.currentTimeMillis()){
-                    System.out.println(new Date() + ": " + Thread.currentThread().getName() + " | removing " + server.getAddress() + " - heartbeat lost");
+                    log("removing " + server.getAddress() + " - heartbeat lost");
                     MasterServer.this.servers.remove(server);
                 }
             });
@@ -119,18 +121,18 @@ public class MasterServer extends Threaded {
 
     @Override
     protected void doAfterStop() {
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " closing socket");
+        log(" closing socket");
         socket.close();
         socket = null;
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " cancelling cleanup timer");
+        log(" cancelling cleanup timer");
         timer.cancel();
     }
 
     @Override
     protected void doBeforeStart() throws Exception {
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " binding UDP socket");
+        log(" binding UDP socket");
         socket = new DatagramSocket(port);
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " starting cleanup timer");
+        log(" starting cleanup timer");
         timer.schedule(new CacheCleanTask(), 0, cleanupPeriod);
     }
 
@@ -151,19 +153,19 @@ public class MasterServer extends Threaded {
         if (command.getCommandText() == null){ return; }
         threadPool.submit(() -> {
             if (command.getCommandText().startsWith("heartbeat ")){
-                System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " <<< " + command.getCommandText());
+                log(command.getEndpoint() + " -> " + command.getCommandText());
                 processHeartbeat(command);
             } else if (command.getCommandText().equalsIgnoreCase("infoResponse")){
                 processInfoResponse(command);
             } else if (command.getCommandText().startsWith("getservers ")){
                 try {
-                    System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " <<< " + command.getCommandText());
+                    log(command.getEndpoint() + " -> " + command.getCommandText());
                     processGetServers(command);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             } else {
-                System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " UNKNOWN COMMAND:  " + command.getCommandText());
+                log(" UNKNOWN COMMAND:  " + command.getCommandText());
             }
         });
     }
@@ -185,7 +187,7 @@ public class MasterServer extends Threaded {
                                 (server.getPlayersPresent() < server.getSlotsAvailable() && server.getPlayersPresent() > 0)
                 )
         ).collect(Collectors.toSet());
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " sending " + filtered.size() + " servers out of " + servers.size());
+        log(command.getEndpoint() + " <- sending " + filtered.size() + " servers out of " + servers.size());
         byte[] buffer = new byte[28 + 7 * filtered.size()];
         ByteBuffer data = ByteBuffer.wrap(buffer);
         data.put((byte)0xFF);
@@ -204,7 +206,7 @@ public class MasterServer extends Threaded {
         data.put((byte)0x00);
         data.put((byte)0x00);
         data.put((byte)0x00);
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " getserversResponse -> " + command.getEndpoint() + " sent " + ProtocolUtil.hex(data.array()));
+        log(" getserversResponse -> " + command.getEndpoint() + " sent " + ProtocolUtil.hex(data.array()));
         socket.send(createPacket(data.array(), command.getEndpoint()));
     }
 
@@ -234,19 +236,19 @@ public class MasterServer extends Threaded {
         String challenge = info.get("challenge");
         String storedEndpoint = challenges.remove(challenge);
         if (storedEndpoint == null){
-            System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " Unknown challenge \"" + challenge + "\"");
+            log(command.getEndpoint() + " ERROR Unknown challenge \"" + challenge + "\"");
             return;
         }
         if (storedEndpoint != null && !storedEndpoint.equals(command.getEndpoint())){
-            System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " IP mismatched for challenge \"" + challenge + "\": " + storedEndpoint);
+            log(command.getEndpoint() + " ERROR IP mismatched for challenge \"" + challenge + "\": " + storedEndpoint);
             return;
         }
         GameServer server = ProtocolUtil.createServerInfoFromResponse(command.getInfoPacket(), command.getEndpoint());
         if (!servers.add(server)){
-            System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " REFRESHING ");
+            log(command.getEndpoint() + " REFRESHING hit time");
             refreshHit(server);
         } else {
-            System.out.println(new Date() + ": " + Thread.currentThread().getName() + " -> " + command.getEndpoint() + " REGISTERING " + server.getDisplayName() + " <- " + server.getGameType());
+            log(command.getEndpoint() + " REGISTERING " + server.getDisplayName() + " <- " + server.getGameType());
         }
     }
 
@@ -257,7 +259,7 @@ public class MasterServer extends Threaded {
     private void processHeartbeat(Command command) {
         String challenge = ProtocolUtil.createChallenge();
         challenges.put(challenge, command.getEndpoint());
-        System.out.println(new Date() + ": " + Thread.currentThread().getName() + " registered challenge \"" + challenge + "\" for " + command.getEndpoint());
+        log(" registered challenge \"" + challenge + "\" for " + command.getEndpoint());
         String cmd = "getinfo " + challenge;
         try {
             sendMasterCommand(cmd, command.getEndpoint());
