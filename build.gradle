@@ -13,6 +13,20 @@ jar {
     }
 }
 
+task copyPropfile {
+    outputs.file new File("$buildDir/crosshair.properties")
+    doLast {
+        copy {
+            from "crosshair.properties"
+            into "$buildDir/crosshair.properties"
+        }
+    }
+}
+
+applicationDistribution.from(copyPropfile) {
+    into "lib"
+}
+
 repositories {
     mavenCentral()
 }
